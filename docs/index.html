@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clock</title>
+  <style>
+    /* ── Reset & base ───────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --text-primary: #f0f0f5;
+      --text-secondary: rgba(240,240,245,0.45);
+      --accent: #7c6fef;
+      --accent-glow: rgba(124,111,239,0.25);
+      --select-bg: rgba(255,255,255,0.06);
+      --panel-bg: rgba(15,15,25,0.92);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f4f8;
+        --surface: rgba(0,0,0,0.04);
+        --border: rgba(0,0,0,0.1);
+        --text-primary: #0a0a0f;
+        --text-secondary: rgba(10,10,15,0.45);
+        --accent: #5a4fcc;
+        --accent-glow: rgba(90,79,204,0.18);
+        --select-bg: rgba(0,0,0,0.06);
+        --panel-bg: rgba(240,240,248,0.96);
+      }
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.4s ease;
+    }
+
+    /* ── Background ambient orbs ────────────── */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.18;
+      pointer-events: none;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+
+    .bg-orb-1 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, #7c6fef, transparent 70%);
+      top: -150px; left: -100px;
+      animation-duration: 20s;
+    }
+
+    .bg-orb-2 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #ef6f9a, transparent 70%);
+      bottom: -120px; right: -80px;
+      animation-duration: 25s;
+      animation-delay: -8s;
+    }
+
+    .bg-orb-3 {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, #6fefdb, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation-duration: 30s;
+      animation-delay: -15s;
+      opacity: 0.08;
+    }
+
+    @keyframes drift {
+      0%   { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(40px, 30px) scale(1.08); }
+    }
+
+    /* ── Settings button (top-right) ─────────── */
+    .settings-btn {
+      position: fixed;
+      top: 1.2rem;
+      right: 1.4rem;
+      z-index: 100;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.55em 0.65em;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+      opacity: 0;
+      animation: fadeSlideDown 0.8s ease forwards 1s;
+    }
+
+    .settings-btn:hover {
+      background: var(--select-bg);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .settings-btn span {
+      display: block;
+      width: 20px;
+      height: 2px;
+      background: var(--text-primary);
+      border-radius: 2px;
+      transition: background 0.2s;
+    }
+
+    .settings-btn:hover span {
+      background: var(--accent);
+    }
+
+    /* ── Settings panel (slide-in from top-right) */
+    .settings-panel {
+      position: fixed;
+      top: 4rem;
+      right: 1.4rem;
+      z-index: 99;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.2em 1.4em;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+      min-width: 260px;
+      transform: translateY(-8px) scale(0.97);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .settings-panel.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+
+    .settings-panel-title {
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 0.8em;
+    }
+
+    .tz-select {
+      appearance: none;
+      background: #1a1a2e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #f0f0f5;
+      font-size: 0.85rem;
+      padding: 0.5em 2.4em 0.5em 1em;
+      cursor: pointer;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237c6fef' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.8em center;
+      color-scheme: dark;
+    }
+
+    .tz-select option {
+      background: #1a1a2e;
+      color: #f0f0f5;
+    }
+
+    .tz-select:hover, .tz-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* ── Main container ─────────────────────── */
+    .clock-container {
+      text-align: center;
+      z-index: 1;
+      user-select: none;
+    }
+
+    /* ── Date line ──────────────────────────── */
+    .date-line {
+      font-size: clamp(0.9rem, 2vw, 1.2rem);
+      font-weight: 300;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 0.6em;
+      opacity: 0;
+      animation: fadeSlideDown 1s ease forwards 0.3s;
+    }
+
+    /* ── Time display ───────────────────────── */
+    .time-display {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 0.02em;
+      opacity: 0;
+      animation: fadeSlideDown 1s ease forwards 0.1s;
+    }
+
+    .time-main {
+      font-size: clamp(5rem, 18vw, 18rem);
+      font-weight: 100;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--text-primary) 40%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      transition: opacity 0.08s ease;
+    }
+
+    .time-seconds {
+      font-size: clamp(2rem, 6vw, 6rem);
+      font-weight: 200;
+      letter-spacing: -0.01em;
+      line-height: 1;
+      color: var(--text-secondary);
+      align-self: flex-end;
+      padding-bottom: 0.12em;
+      min-width: 1.6em;
+      transition: opacity 0.08s ease;
+    }
+
+    /* Pulse on each second tick */
+    @keyframes secondPulse {
+      0%   { opacity: 1; }
+      15%  { opacity: 0.55; }
+      35%  { opacity: 1; }
+    }
+
+    .tick .time-seconds {
+      animation: secondPulse 0.5s ease;
+    }
+
+    /* ── Seconds progress bar ────────────────── */
+    .progress-wrap {
+      width: clamp(200px, 40vw, 600px);
+      height: 2px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 1.8em auto 0;
+      opacity: 0;
+      animation: fadeSlideDown 1s ease forwards 0.7s;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #ef6f9a);
+      border-radius: 2px;
+      transition: width 0.98s linear;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    /* ── Animations ─────────────────────────── */
+    @keyframes fadeSlideDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient background orbs -->
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+
+  <!-- Settings button top-right -->
+  <button class="settings-btn" id="settingsBtn" aria-label="Settings">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-panel-title">Timezone</div>
+    <select class="tz-select" id="tzSelect"></select>
+  </div>
+
+  <div class="clock-container" id="clockContainer">
+    <div class="date-line" id="dateLine">–</div>
+
+    <div class="time-display" id="timeDisplay">
+      <span class="time-main" id="timeMain">00:00</span>
+      <span class="time-seconds" id="timeSec">00</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── Settings panel toggle ────────────────────────────────────
+    const settingsBtn   = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
+
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsPanel.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+        settingsPanel.classList.remove('open');
+      }
+    });
+
+    // ── Timezone population ─────────────────────────────────────
+    const tzSelect = document.getElementById('tzSelect');
+
+    function populateTimezones() {
+      let zones;
+      try {
+        zones = Intl.supportedValuesOf('timeZone');
+      } catch {
+        zones = [
+          'UTC','America/New_York','America/Chicago','America/Denver',
+          'America/Los_Angeles','America/Anchorage','Pacific/Honolulu',
+          'Europe/London','Europe/Paris','Europe/Berlin','Europe/Moscow',
+          'Asia/Dubai','Asia/Kolkata','Asia/Bangkok','Asia/Shanghai',
+          'Asia/Tokyo','Australia/Sydney','Pacific/Auckland'
+        ];
+      }
+
+      const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      zones.forEach(tz => {
+        const opt = document.createElement('option');
+        opt.value = tz;
+        opt.textContent = tz.replace(/_/g, ' ');
+        if (tz === local) opt.selected = true;
+        tzSelect.appendChild(opt);
+      });
+    }
+
+    populateTimezones();
+
+    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tzSelect.value !== localTz) {
+      tzSelect.value = 'UTC';
+    }
+
+    // ── Clock update ────────────────────────────────────────────
+    const dateLine    = document.getElementById('dateLine');
+    const timeMain    = document.getElementById('timeMain');
+    const timeSec     = document.getElementById('timeSec');
+    const progressBar = document.getElementById('progressBar');
+    const container   = document.getElementById('clockContainer');
+
+    let lastSec = -1;
+
+    function updateClock() {
+      const tz  = tzSelect.value;
+      const now = new Date();
+
+      // Date string
+      const dateFmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        weekday: 'long',
+        year:    'numeric',
+        month:   'long',
+        day:     'numeric'
+      });
+      dateLine.textContent = dateFmt.format(now);
+
+      // Time parts (24-hour)
+      const timeFmt = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        hour:   '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+
+      const parts = {};
+      timeFmt.formatToParts(now).forEach(p => { parts[p.type] = p.value; });
+
+      const hhmm = `${parts.hour}:${parts.minute}`;
+      const ss   = parts.second;
+
+      timeMain.textContent = hhmm;
+      timeSec.textContent  = ss;
+
+      // Seconds progress bar (0–59 → 0–100%)
+      const secInt = parseInt(ss, 10);
+      if (secInt === 0) {
+        progressBar.style.transition = 'none';
+        progressBar.style.width = '0%';
+        requestAnimationFrame(() => {
+          progressBar.style.transition = '';
+        });
+      } else {
+        progressBar.style.width = `${((secInt + 1) / 60) * 100}%`;
+      }
+
+      // Pulse animation on second change
+      if (secInt !== lastSec) {
+        lastSec = secInt;
+        container.classList.remove('tick');
+        void container.offsetWidth;
+        container.classList.add('tick');
+      }
+    }
+
+    tzSelect.addEventListener('change', updateClock);
+
+    updateClock();
+    const offset = 1000 - (Date.now() % 1000);
+    setTimeout(() => {
+      updateClock();
+      setInterval(updateClock, 1000);
+    }, offset);
+  </script>
+</body>
+</html>
